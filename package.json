@@ -1,32 +1,32 @@
 {
-  "name": "blurchat-server",
+  "name": "blurchat-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "private": true,
+  "type": "commonjs",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "cors": "^2.8.5",
-    "dotenv": "^17.2.1",
-    "express": "^5.1.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^8.1.0",
     "morgan": "^1.10.1",
-    "socket.io": "^4.8.1",
+    "socket.io": "^4.7.5",
     "socket.io-client": "^4.8.1",
-    "uuid": "^11.1.0"
+    "winston": "^3.17.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.3",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/helmet": "^0.0.48",
     "@types/morgan": "^1.9.10",
-    "@types/node": "^24.2.0",
-    "@types/socket.io": "^3.0.1",
-    "@types/uuid": "^10.0.0",
-    "ts-node-dev": "^2.0.0",
-    "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.9.2"
+    "@types/node": "^20.14.10",
+    "@types/winston": "^2.4.4",
+    "nodemon": "^3.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
   }
 }

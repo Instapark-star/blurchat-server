@@ -3,23 +3,23 @@ import { Router } from "express";
 import {
   getMessagesByRoom,
   postMessage,
-  deleteMessagesByRoom
+  deleteRoomMessages,
+  listRooms,
+  createRoom,
+  sendPrivateMessage,
+  getPrivateMessages,
 } from "../controllers/chatController";
 
 const router = Router();
 
-// GET /api/chat/:roomId/messages
-router.get("/:roomId/messages", getMessagesByRoom);
+router.get("/rooms", listRooms);
+router.post("/rooms", createRoom);
 
-// POST /api/chat/:roomId/messages
-router.post("/:roomId/messages", postMessage);
+router.get("/rooms/:roomId/messages", getMessagesByRoom);
+router.post("/rooms/:roomId/messages", postMessage);
+router.delete("/rooms/:roomId/messages", deleteRoomMessages);
 
-// DELETE /api/chat/:roomId/messages
-router.delete("/:roomId/messages", deleteMessagesByRoom);
-
-// Optional test route
-router.get("/", (req, res) => {
-  res.json({ message: "Chat route works!" });
-});
+router.post("/private", sendPrivateMessage);
+router.get("/private/:user1/:user2", getPrivateMessages);
 
 export default router;

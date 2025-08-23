@@ -1,22 +1,20 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",                        // ✅ For import.meta
-    "moduleResolution": "Bundler",             // ✅ Works well with Vite
-    "lib": ["DOM", "ESNext"],                  // ✅ Needed for web APIs
-    "jsx": "react-jsx",                        // ✅ For React 17+
-    "types": ["vite/client"],                  // ✅ Fixes ImportMeta.env error
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "strict": true,
-    "resolveJsonModule": true,
-    "outDir": "dist",
-    "rootDir": "src",
+    "target": "ES2020",
+    "module": "CommonJS",
+    "outDir": "./dist",
+    "rootDir": "./src",
     "baseUrl": "./src",
     "paths": {
       "@/*": ["*"]
-    }
+    },
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "dist"]
 }

@@ -1,10 +1,16 @@
 // src/middleware/notFound.ts
+import { Request, Response, NextFunction } from "express";
+import logger from "@/utils/logger";
 
-import { Request, Response, NextFunction } from "express"
+export const notFound = (req: Request, res: Response, _next: NextFunction) => {
+  const message = `🔍 Route not found: ${req.originalUrl}`;
+  logger.warn(message);
 
-export const notFound = (req: Request, res: Response, next: NextFunction) => {
   res.status(404).json({
     success: false,
-    message: `Route ${req.originalUrl} not found`,
-  })
-}
+    error: "Not Found",
+    message,
+  });
+};
+
+export default notFound;

@@ -1,137 +1,113 @@
 // src/utils/messageUtils.ts
-import fs from "fs";
-import path from "path";
+import * as fs from "fs";
+import * as path from "path";
+import { ChatMessage, MessagesByRoom, PrivateMessagesStore } from "../types/message";
 
-export type Message = {
-  id?: string;
-  username: string;
-  message: string;
-  room: string;
-  timestamp: string;
-  [key: string]: any;
-};
+const DATA_DIR = path.resolve(__dirname, "../../data");
+const PUBLIC_FILE = path.join(DATA_DIR, "messages.json");
+const PRIVATE_FILE = path.join(DATA_DIR, "privateMessages.json");
 
-export type MessagesByRoom = Record<string, Message[]>;
-
-const messagesFilePath = path.join(__dirname, "../../data/messages.json");
-
-/**
- * Ensure the messages file and parent directory exist.
- * If file missing, create it as an empty object (room-keyed).
- */
-const ensureFileExists = () => {
-  try {
-    const dir = path.dirname(messagesFilePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(messagesFilePath)) {
-      fs.writeFileSync(messagesFilePath, JSON.stringify({}, null, 2), "utf-8");
-    }
-  } catch (err) {
-    console.error("❌ messageUtils.ensureFileExists error:", err);
+function ensureDataFiles() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
   }
-};
-
-/**
- * Read messages.json and return an object keyed by roomId.
- * Supports two on-disk shapes:
- *  - array of messages (legacy): [{ room, ... }, ...]
- *  - object keyed by roomId: { roomId: [ ... ], ... }
- */
-export const readMessages = (): MessagesByRoom => {
-  ensureFileExists();
-
-  try {
-    const raw = fs.readFileSync(messagesFilePath, "utf-8").trim();
-    if (!raw) return {};
-
-    const parsed = JSON.parse(raw);
-
-    // Legacy format (array) -> convert to object keyed by room
-    if (Array.isArray(parsed)) {
-      const grouped: MessagesByRoom = {};
-      parsed.forEach((m: any) => {
-        const room = m.room || "default";
-        if (!grouped[room]) grouped[room] = [];
-        grouped[room].push(m as Message);
-      });
-      return grouped;
-    }
-
-    // If already an object keyed by roomId, return as-is
-    if (parsed && typeof parsed === "object") {
-      return parsed as MessagesByRoom;
-    }
-
-    // Unexpected shape -> return empty
-    return {};
-  } catch (err) {
-    console.error("❌ Failed to read/parse messages.json:", err);
-    return {};
+  if (!fs.existsSync(PUBLIC_FILE)) {
+    const initial: MessagesByRoom = { general: [] };
+    fs.writeFileSync(PUBLIC_FILE, JSON.stringify(initial, null, 2), "utf8");
   }
-};
-
-/**
- * Write the room-keyed messages object back to messages.json
- */
-export const writeMessages = (messages: MessagesByRoom) => {
-  ensureFileExists();
-  try {
-    fs.writeFileSync(messagesFilePath, JSON.stringify(messages, null, 2), "utf-8");
-  } catch (err) {
-    console.error("❌ Failed to write messages.json:", err);
+  if (!fs.existsSync(PRIVATE_FILE)) {
+    const initial: PrivateMessagesStore = [];
+    fs.writeFileSync(PRIVATE_FILE, JSON.stringify(initial, null, 2), "utf8");
   }
-};
+}
 
-/**
- * Convenience helpers
- */
-export const getMessagesForRoom = (roomId: string): Message[] => {
-  const all = readMessages();
-  return all[roomId] || [];
-};
+function safeParse<T>(raw: string, fallback: T): T {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
 
-/**
- * Adds a message into the specified room and returns the saved message (with id/timestamp).
- * Uses computed id/timestamp to avoid duplicate-property warnings.
- */
-export const addMessageToRoom = (roomId: string, message: Partial<Message>): Message => {
-  const all = readMessages();
-  if (!all[roomId]) all[roomId] = [];
+function readJson<T>(filePath: string, fallback: T): T {
+  ensureDataFiles();
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    const parsed = safeParse<T>(raw, fallback);
+    if (!parsed) {
+      writeJson(filePath, fallback);
+      return fallback;
+    }
+    return parsed;
+  } catch {
+    writeJson(filePath, fallback);
+    return fallback;
+  }
+}
 
-  const id = message.id ?? Date.now().toString();
-  const timestamp = message.timestamp ?? new Date().toISOString();
+function writeJson<T>(filePath: string, data: T): void {
+  ensureDataFiles();
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
+}
 
-  // Build final message object once (no duplicated keys in literal)
-  const msgWithMeta: Message = {
-    ...message,
-    id,
-    timestamp,
-    room: roomId,
-  } as Message;
+/* Public room functions */
+export function readMessages(): MessagesByRoom {
+  return readJson<MessagesByRoom>(PUBLIC_FILE, { general: [] });
+}
 
-  all[roomId].push(msgWithMeta);
-  writeMessages(all);
-  return msgWithMeta;
-};
+export function writeMessages(data: MessagesByRoom): void {
+  writeJson<MessagesByRoom>(PUBLIC_FILE, data);
+}
 
-export const deleteMessagesByRoom = (roomId: string): boolean => {
-  const all = readMessages();
-  if (!all[roomId] || all[roomId].length === 0) return false;
-  all[roomId] = [];
-  writeMessages(all);
-  return true;
-};
+export function getMessagesForRoom(room: string): ChatMessage[] {
+  const store = readMessages();
+  return store[room] ?? [];
+}
 
-export const deleteMessageById = (roomId: string, messageId: string): boolean => {
-  const all = readMessages();
-  const room = all[roomId];
-  if (!room || room.length === 0) return false;
-  const idx = room.findIndex((m) => m.id === messageId);
+export function addMessageToRoom(room: string, msg: ChatMessage): void {
+  const store = readMessages();
+  if (!store[room]) store[room] = [];
+  store[room].push(msg);
+  writeMessages(store);
+}
+
+export function deleteMessagesByRoom(room: string): void {
+  const store = readMessages();
+  if (store[room]) {
+    store[room] = [];
+    writeMessages(store);
+  }
+}
+
+export function deleteMessageById(room: string, messageId: string): boolean {
+  const store = readMessages();
+  if (!store[room]) return false;
+  const idx = store[room].findIndex(m => m.id === messageId);
   if (idx === -1) return false;
-  room.splice(idx, 1);
-  all[roomId] = room;
-  writeMessages(all);
+  store[room].splice(idx, 1);
+  writeMessages(store);
   return true;
-};
+}
+
+/* Private messages functions */
+export function readPrivateMessages(): PrivateMessagesStore {
+  return readJson<PrivateMessagesStore>(PRIVATE_FILE, []);
+}
+
+export function writePrivateMessages(list: PrivateMessagesStore): void {
+  writeJson<PrivateMessagesStore>(PRIVATE_FILE, list);
+}
+
+export function addPrivateMessage(msg: ChatMessage): void {
+  const list = readPrivateMessages();
+  list.push(msg);
+  writePrivateMessages(list);
+}
+
+export function getPrivateMessagesBetween(userA: string, userB: string): ChatMessage[] {
+  const list = readPrivateMessages();
+  return list.filter(m =>
+    m.type === "private" &&
+    ((m.sender === userA && m.recipient === userB) || (m.sender === userB && m.recipient === userA))
+  );
+}
