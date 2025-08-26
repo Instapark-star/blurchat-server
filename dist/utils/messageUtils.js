@@ -35,8 +35,14 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.readMessages = readMessages;
 exports.writeMessages = writeMessages;
+exports.getMessagesForRoom = getMessagesForRoom;
+exports.addMessageToRoom = addMessageToRoom;
+exports.deleteMessagesByRoom = deleteMessagesByRoom;
+exports.deleteMessageById = deleteMessageById;
 exports.readPrivateMessages = readPrivateMessages;
 exports.writePrivateMessages = writePrivateMessages;
+exports.addPrivateMessage = addPrivateMessage;
+exports.getPrivateMessagesBetween = getPrivateMessagesBetween;
 // src/utils/messageUtils.ts
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
@@ -69,7 +75,6 @@ function readJson(filePath, fallback) {
     try {
         const raw = fs.readFileSync(filePath, "utf8");
         const parsed = safeParse(raw, fallback);
-        // auto-repair corrupted file
         if (!parsed) {
             writeJson(filePath, fallback);
             return fallback;
@@ -85,17 +90,56 @@ function writeJson(filePath, data) {
     ensureDataFiles();
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
 }
-/* -------------------- Public Room Messages -------------------- */
+/* Public room functions */
 function readMessages() {
     return readJson(PUBLIC_FILE, { general: [] });
 }
 function writeMessages(data) {
     writeJson(PUBLIC_FILE, data);
 }
-/* -------------------- Private Messages -------------------- */
+function getMessagesForRoom(room) {
+    const store = readMessages();
+    return store[room] ?? [];
+}
+function addMessageToRoom(room, msg) {
+    const store = readMessages();
+    if (!store[room])
+        store[room] = [];
+    store[room].push(msg);
+    writeMessages(store);
+}
+function deleteMessagesByRoom(room) {
+    const store = readMessages();
+    if (store[room]) {
+        store[room] = [];
+        writeMessages(store);
+    }
+}
+function deleteMessageById(room, messageId) {
+    const store = readMessages();
+    if (!store[room])
+        return false;
+    const idx = store[room].findIndex(m => m.id === messageId);
+    if (idx === -1)
+        return false;
+    store[room].splice(idx, 1);
+    writeMessages(store);
+    return true;
+}
+/* Private messages functions */
 function readPrivateMessages() {
     return readJson(PRIVATE_FILE, []);
 }
 function writePrivateMessages(list) {
     writeJson(PRIVATE_FILE, list);
+}
+function addPrivateMessage(msg) {
+    const list = readPrivateMessages();
+    list.push(msg);
+    writePrivateMessages(list);
+}
+function getPrivateMessagesBetween(userA, userB) {
+    const list = readPrivateMessages();
+    return list.filter(m => m.type === "private" &&
+        ((m.sender === userA && m.recipient === userB) || (m.sender === userB && m.recipient === userA)));
 }

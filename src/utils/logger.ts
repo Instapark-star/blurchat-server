@@ -1,4 +1,5 @@
-import winston, { format, Logger } from "winston";
+// src/utils/logger.ts
+import { createLogger, format, transports, Logger } from "winston";
 import path from "path";
 import fs from "fs";
 
@@ -8,44 +9,31 @@ if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
 
-const { combine, timestamp, errors, json, colorize, printf } = format;
-
-// Custom printf format with correct typing
-const consoleFormat = printf((info) => {
-  const message = typeof info.message === "string" ? info.message : JSON.stringify(info.message);
-  const timestamp = info.timestamp ?? new Date().toISOString();
-  const stack = info.stack ?? "";
-  return `${timestamp} [${info.level}]: ${stack || message}`;
-});
-
-const logger: Logger = winston.createLogger({
+const logger: Logger = createLogger({
   level: process.env.LOG_LEVEL || "info",
-  format: combine(
-    timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-    errors({ stack: true }),
-    json()
+  format: format.combine(
+    format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+    format.errors({ stack: true }),
+    format.printf(({ timestamp, level, message, stack }) => {
+      const logMessage =
+        typeof message === "string" ? message : JSON.stringify(message);
+      return `[${timestamp}] ${level.toUpperCase()}: ${stack || logMessage}`;
+    })
   ),
   transports: [
-    new winston.transports.File({
-      filename: path.join(logDir, "combined.log"),
+    new transports.Console(),
+    new transports.File({
+      filename: path.join(logDir, "error.log"),
+      level: "error",
       maxsize: 5 * 1024 * 1024, // 5MB
       maxFiles: 5,
     }),
-    new winston.transports.File({
-      filename: path.join(logDir, "error.log"),
-      level: "error",
+    new transports.File({
+      filename: path.join(logDir, "combined.log"),
       maxsize: 5 * 1024 * 1024,
       maxFiles: 5,
     }),
   ],
 });
-
-if (process.env.NODE_ENV !== "production") {
-  logger.add(
-    new winston.transports.Console({
-      format: combine(colorize(), timestamp({ format: "YYYY-MM-DD HH:mm:ss" }), consoleFormat),
-    })
-  );
-}
 
 export default logger;

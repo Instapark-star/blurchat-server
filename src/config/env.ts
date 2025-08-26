@@ -1,9 +1,7 @@
 // src/config/env.ts
 import dotenv from "dotenv";
-
 dotenv.config();
 
-// Fallbacks for dev mode
 export const PORT: number = parseInt(process.env.PORT || "4000", 10);
 
 export const FRONTEND_ORIGINS: string[] = (

@@ -1,17 +1,30 @@
 // src/lib/socket.ts
+import { Server } from "socket.io";
+import http from "http";
 
-import { io, Socket } from "socket.io-client";
-import dotenv from "dotenv";
+let io: Server | null = null;
 
-dotenv.config(); // Load .env variables for backend
+export const initSocket = (server: http.Server) => {
+  io = new Server(server, {
+    cors: {
+      origin: "*", // allow all for now, adjust later if needed
+    },
+  });
 
-// Get server URL from environment variables
-const SERVER_URL = process.env.SERVER_URL || "http://localhost:3000";
+  io.on("connection", (socket) => {
+    console.log("⚡ New client connected:", socket.id);
 
-// Create a single shared socket instance for backend
-const socket: Socket = io(SERVER_URL, {
-  transports: ["websocket"],
-  withCredentials: true,
-});
+    socket.on("disconnect", () => {
+      console.log("❌ Client disconnected:", socket.id);
+    });
+  });
 
-export default socket;
+  return io;
+};
+
+export const getIO = (): Server => {
+  if (!io) {
+    throw new Error("Socket.io not initialized!");
+  }
+  return io;
+};
