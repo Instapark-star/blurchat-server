@@ -1,7 +1,8 @@
+// src/services/socketService.ts
 import { Server, Socket } from "socket.io";
-import { addUserToQueue, removeUserFromQueue } from "./matchmakingService";
+import { addUserToQueue, removeUserFromQueue } from "../services/matchmakingService";
 
-// We store active matches here: socketId -> partnerSocketId
+// Active matches: socketId -> partnerSocketId
 const activeMatches: Map<string, string> = new Map();
 
 /**
@@ -46,6 +47,22 @@ export function registerChatHandlers(io: Server, socket: Socket) {
     } else {
       socket.emit("error_message", "⚠️ You are not connected to a partner.");
     }
+  });
+
+  /**
+   * Handle user manually leaving match
+   */
+  socket.on("leave_match", () => {
+    const partnerId = activeMatches.get(socket.id);
+
+    if (partnerId) {
+      io.to(partnerId).emit("partner_disconnected");
+      activeMatches.delete(partnerId);
+      console.log(`🔴 ${socket.id} left, notified ${partnerId}`);
+    }
+
+    activeMatches.delete(socket.id);
+    removeUserFromQueue(socket.id);
   });
 
   /**
