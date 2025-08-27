@@ -5,7 +5,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import chatRoutes from "./routes/chatRoutes";
 import { registerChatHandlers } from "./services/socketService"; // ✅ fixed import
-import { logger } from "./utils/logger";
+import  logger  from "./utils/logger";
 
 dotenv.config();
 
