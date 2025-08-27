@@ -1,55 +1,70 @@
-// src/services/socketService.ts
 import { Server, Socket } from "socket.io";
-import { ChatMessage } from "../types/message";
-import {
-  addMessageToRoom,
-  getMessagesForRoom,
-  deleteMessagesByRoom,
-  deleteMessageById,
-  addPrivateMessage,
-  getPrivateMessagesBetween,
-} from "../utils/messageUtils";
+import { addUserToQueue, removeUserFromQueue } from "./matchmakingService";
 
-type User = {
-  socketId: string;
-  username: string;
-  room: string | null;
-};
+// We store active matches here: socketId -> partnerSocketId
+const activeMatches: Map<string, string> = new Map();
 
-const rooms = new Map<string, Set<string>>(); // room -> socketIds
-const users = new Map<string, User>();        // socketId -> User
-const typing = new Map<string, Set<string>>(); // room -> set(username)
+/**
+ * Register all chat + matchmaking handlers for a connected socket
+ */
+export function registerChatHandlers(io: Server, socket: Socket) {
+  console.log(`🟢 Socket connected: ${socket.id}`);
 
-const listRooms = (): string[] => Array.from(rooms.keys());
+  /**
+   * User requests matchmaking
+   */
+  socket.on("find_partner", () => {
+    const partner = addUserToQueue(socket.id);
 
-function emitRooms(io: Server): void {
-  io.emit("roomsUpdated", listRooms());
-}
+    if (partner) {
+      // Save both users as matched
+      activeMatches.set(socket.id, partner);
+      activeMatches.set(partner, socket.id);
 
-function getRoomUsers(room: string): User[] {
-  const ids = rooms.get(room) ?? new Set();
-  return Array.from(ids)
-    .map((id) => users.get(id))
-    .filter((u): u is User => Boolean(u));
-}
+      // Notify both users
+      io.to(socket.id).emit("partner_found", { partnerId: partner });
+      io.to(partner).emit("partner_found", { partnerId: socket.id });
 
-function broadcastRoomUsers(io: Server, room: string): void {
-  io.to(room).emit("roomUsers", getRoomUsers(room));
-}
-
-export function registerSocketHandlers(io: Server, socket: Socket): void {
-  // register initial user
-  users.set(socket.id, { socketId: socket.id, username: "Anonymous", room: null });
-
-  socket.emit("roomsUpdated", listRooms());
-
-  socket.on("register", (username: string) => {
-    const u = users.get(socket.id);
-    if (!u) return;
-    u.username = (username ?? "").trim() || "Anonymous";
-    users.set(socket.id, u);
-    socket.emit("registered", u.username);
+      console.log(`🤝 Match created: ${socket.id} <-> ${partner}`);
+    } else {
+      console.log(`⏳ ${socket.id} is waiting for a partner...`);
+    }
   });
 
-  // ... keep rest of handlers as in your code (no type errors)
+  /**
+   * Relay messages between matched partners
+   */
+  socket.on("send_message", (message: string) => {
+    const partnerId = activeMatches.get(socket.id);
+
+    if (partnerId) {
+      io.to(partnerId).emit("receive_message", {
+        from: socket.id,
+        message,
+      });
+      console.log(`💬 ${socket.id} -> ${partnerId}: ${message}`);
+    } else {
+      socket.emit("error_message", "⚠️ You are not connected to a partner.");
+    }
+  });
+
+  /**
+   * Handle disconnects
+   */
+  socket.on("disconnect", () => {
+    console.log(`❌ Disconnected: ${socket.id}`);
+
+    // Remove from queue if waiting
+    removeUserFromQueue(socket.id);
+
+    // Notify partner if matched
+    const partnerId = activeMatches.get(socket.id);
+    if (partnerId) {
+      io.to(partnerId).emit("partner_disconnected");
+      activeMatches.delete(partnerId);
+      console.log(`🔴 Notified ${partnerId} that partner left.`);
+    }
+
+    activeMatches.delete(socket.id);
+  });
 }
